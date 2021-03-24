@@ -28,7 +28,6 @@ class Gateway extends \Sale\PaymentGateway\GatewayAbstract {
 				],                
 				[
 					'name'       => 'paymentType',
-					'xtype'      => 'textfield',
 					'fieldLabel' => $t->_('Способ оплаты'),
 					'xtype'      => 'combobox',
 					'value'      => '',
