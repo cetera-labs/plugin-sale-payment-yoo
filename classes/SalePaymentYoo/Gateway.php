@@ -1,54 +1,90 @@
 <?php
 namespace SalePaymentYoo;
+use \YooKassa\Client;
+class Gateway extends \Sale\PaymentGateway\GatewayAtol {
 
-use YooCheckout\Client;
 
-class Gateway extends \Sale\PaymentGateway\GatewayAbstract {
-		
-	public static function getInfo()
-	{
-		$t = \Cetera\Application::getInstance()->getTranslator();
-		
+    public static function getInfo2()
+	{    
 		return [
-			'name'        => 'Ю-Касса',
+			'name'        => 'Юкасса',
 			'description' => '',
-			'icon'        => '/plugins/sale-payment-yandex/images/yandex.png',
-			'params' => [	
+			'icon'        => '/plugins/sale-payment-sber/images/icon.png',
+			'params' => [		
 				[
-					'name'       => 'shopId',
+					'name'       => 'shopID',
 					'xtype'      => 'textfield',
-					'fieldLabel' => $t->_('Идентификатор магазина *'),
+					'fieldLabel' => 'ID магазина, полученный при подключении',
+					'allowBlank' => false,
+				],
+                [
+					'name'       => 'secret',
+					'xtype'      => 'textfield',
+					'fieldLabel' => 'Секретный ключ, полученный при подключении',
+					'allowBlank' => false,
+				],                             
+                [
+					'xtype'      => 'displayfield',
+					'fieldLabel' => 'URL-адрес для callback уведомлений',
+					'value'      => '//'.$_SERVER['HTTP_HOST'].'/cms/plugins/sale-payment-yoo/callback.php'
+				],
+                [
+					'name'       => 'returnURL',
+					'xtype'      => 'textfield',
+					'fieldLabel' => 'Страница после совершения платежа',
 					'allowBlank' => false,
 				],	
-				[
-					'name'       => 'shopSecret',
-					'xtype'      => 'textfield',
-					'fieldLabel' => $t->_('Секретный ключ *'),
-					'allowBlank' => false,
-				],                
-				[
-					'name'       => 'paymentType',
-					'fieldLabel' => $t->_('Способ оплаты'),
-					'xtype'      => 'combobox',
-					'value'      => '',
-					'store'      => [
-						['',  $t->_('выбор на стороне Яндекс.Кассы')],
-						['yandex_money',$t->_('оплата из кошелька в Яндекс.Деньгах')],
-						['bank_card',$t->_('оплата с произвольной банковской карты')],
-					],
-				],
-				[
+                [
 					'name'       => 'orderBundle',
 					'xtype'      => 'checkbox',
 					'fieldLabel' => 'Передача корзины товаров (кассовый чек 54-ФЗ)',
 				],
+                [
+                    'name'       => 'paymentObject',
+                    'xtype'      => 'combobox',
+                    'fieldLabel' => 'Тип оплачиваемой позиции',
+                    'value'      => 1,
+                    'store'      => [
+                        ['commodity', 'товар'],
+                        ['excise', 'подакцизный товар'],
+                        ['job', 'работа'],
+                        ['service', 'услуга'],
+                        ['payment', 'платеж'],
+                        ['casino', 'Платеж казино'],
+                        ['gambling_bet', 'ставка азартной игры'],
+                        ['gambling_prize', 'выигрыш азартной игры'],
+                        ['lottery', 'лотерейный билет'],
+                        ['lottery_prize', 'выигрыш лотереи'],
+                        ['intellectual_activity', 'предоставление РИД'],
+                        ['agent_commission', 'агентское вознаграждение'],
+                        ['composite', 'составной предмет расчёта'],
+                        ['another', 'иной предмет расчёта'],
+                    ],
+                ],
+                [
+                    "xtype"          => 'checkbox',
+                    "name"           => 'test_mode',
+                    "boxLabel"       => 'Тестовый режим',
+                    "inputValue"     => 1,
+                    "uncheckeDvalue" => 0
+                ], 
+                [
+                    'name'       => 'paymentMethod',
+                    'xtype'      => 'combobox',
+                    'fieldLabel' => 'Тип оплаты',
+                    'value'      => 1,
+                    'store'      => [
+                        ['full_prepayment', 'полная предварительная оплата до момента передачи предмета расчёта'],
+                        ['partial_prepayment', 'частичная предварительная оплата до момента передачи предмета расчёта'],
+                        ['advance', 'аванс'],
+                        ['full_payment', 'полная оплата в момент передачи предмета расчёта'],
+                        ['partial_payment', 'частичная оплата предмета расчёта в момент его передачи с последующей оплатой в кредит'],
+                        ['credit', 'передача предмета расчёта без его оплаты в момент его передачи с последующей оплатой в кредит'],
+                        ['credit_payment', 'оплата предмета расчёта после его передачи с оплатой в кредит'],
+                    ],
+                ],                
 				[
-					'name'       => 'receiptAfterPayment',
-					'xtype'      => 'checkbox',
-					'fieldLabel' => 'Cценарий "Сначала платеж, потом чек"',
-				],				
-				[
-					'name'       => 'tax_system_code',
+					'name'       => 'taxSystem',
 					'xtype'      => 'combobox',
 					'fieldLabel' => 'Система налогообложения',
 					'value'      => 0,
@@ -62,7 +98,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAbstract {
 					],
 				], 
 				[
-					'name'       => 'vat_code',
+					'name'       => 'taxType',
 					'xtype'      => 'combobox',
 					'fieldLabel' => 'Ставка НДС для товаров',
 					'value'      => 0,
@@ -70,166 +106,217 @@ class Gateway extends \Sale\PaymentGateway\GatewayAbstract {
 						[1, 'без НДС'],
 						[2, 'НДС по ставке 0%'],
 						[3, 'НДС чека по ставке 10%'],
-						[4, 'НДС чека по ставке 20%'],
+                        [4, 'НДС чека по ставке 20%'],
 						[5, 'НДС чека по расчетной ставке 10/110'],
                         [6, 'НДС чека по расчётной ставке 20/120'],
 					],
-				], 
-                [
-                    'name' => 'paymentSubjectType',
-                    'fieldLabel' => $t->_('Признак предмета расчёта'),
-                    'xtype' => 'combobox',
-                    'value' => '',
-                    'store' => [
-                        ['commodity', $t->_('Товар')],
-                        ['excise', $t->_('Подакцизный товар')],
-                        ['job', $t->_('Работа')],
-                        ['service', $t->_('Услуга')],
-                        ['gambling_bet', $t->_('Ставка в азартной игре')],
-                        ['gambling_prize', $t->_('Выигрыш в азартной игре')],
-                        ['lottery', $t->_('Лотерейный билет')],
-                        ['lottery_prize', $t->_('Выигрыш в лотерею')],
-                        ['intellectual_activity', $t->_('Результаты интеллектуальной деятельности')],
-                        ['payment', $t->_('Платеж')],
-                        ['agent_commission', $t->_('Агентское вознаграждение')],
-                        ['composite', $t->_('Несколько вариантов')],
-                        ['another', $t->_('Другое')],
-                    ],
-                    'allowBlank' => false,
-                ],
-                [
-                    'name' => 'paymentMethodType',
-                    'fieldLabel' => $t->_('Признак способа расчёта'),
-                    'xtype' => 'combobox',
-                    'value' => '',
-                    'store' => [
-                        ['full_prepayment', $t->_('Полная предоплата')],
-                        ['partial_prepayment', $t->_('Частичная предоплата')],
-                        ['advance', $t->_('Аванс')],
-                        ['full_payment', $t->_('Полный расчет')],
-                        ['partial_payment', $t->_(' частичный расчет и кредит')],
-                        ['credit', $t->_('Кредит')],
-                        ['credit_payment', $t->_('Выплата по кредиту')],
-                    ],
-                    'allowBlank' => false,
-                ],				
+				],  						
+				
 			]			
-		];
-	}
-	
-	public function pay( $return = '' )
+		];  
+    }
+    public function getPaymentId(){
+
+        $orderId = $this->order->id;
+        return  self::getDbConnection()->fetchColumn('SELECT transaction_id FROM sale_payment_transactions WHERE order_id=?',[$orderId]);
+    }
+    public function cancel( )
+    {
+        $client = new \YooKassa\Client();
+        $client->setAuth($this->params['shopID'], $this->params['secret']);
+        $idempotenceKey = uniqid('', true);
+        $paymentId = $this->getPaymentId();
+        try {
+            $response = $client->cancelPayment($paymentId, $idempotenceKey);
+            if (isset($response['status']) && $response['status'] == "canceled") {
+                $this->order->setPaid(\Sale\Order::PAY_CANCEL)->save();		
+            }
+            else {
+                throw new \Exception("Платёж ".$paymentId." не отменён");
+            } 
+        } catch (\Exception $e) {
+            $response = $e;
+        }
+    }
+
+	public function pay( $return = '', $payParams = [] )
 	{
         header('Location: '.$this->getPayUrl( $return ));
         die();          
 	}
+    
+	public function getStatus() {
+		$params = [
+			'shopID'    => $this->params['shopID'],
+            'secret'    => $this->params['secret']
+		]; 
+        $client = new \YooKassa\Client();
+        $client->setAuth($this->params['shopID'], $this->params['secret']);
+        $paymentId = $this->getPaymentId();
+        try {
+            $response = $client->getPaymentInfo($paymentId);
+        } catch (\Exception $e) {
+            $response = $e;
+        }			
+		return $response;
+	}  
 
-    public function getPayUrl( $return = '' ) {
-        $paymentData = $this->getPaymentData( $return );
-        
-        $client = new Client();
-        $client->setAuth($this->params['shopId'], $this->params['shopSecret']);
-        $response = $client->createPayment(
-            $paymentData,
-            uniqid('', true)
-        );
-        
-        if(isset($response->status) and ($response->status != "canceled") and isset($response->confirmation->confirmation_url) and $response->confirmation->confirmation_url) {
-            $this->saveTransaction($response->id, $response);
-            return $response->confirmation->confirmation_url;         
-        }  
-        else {
-            throw new \Exception('Что-то пошло не так');
-        }        
-    }
-	
-	public function getPaymentData( $return = '' )
+    public function getPayUrl( $return = '', $payParams = [] )
 	{
-		if (!$return) $return = \Cetera\Application::getInstance()->getServer()->getFullUrl();
-		
-        $paymentData = [
-            'amount' => [
-                'value' => $this->order->getTotal(),
-                'currency' => $this->order->getCurrency()->code,
-            ],              
-            'confirmation' => [
-                'type' => 'redirect',
-                'return_url' => $return,
-            ],
-            'capture' => true,
-            'description' => 'Заказ №'.$this->order->id,    
-            'metadata' => [
-                'order_id' => $this->order->id,
-            ]           
-        ];
+        if (!$return) $return = \Cetera\Application::getInstance()->getServer()->getFullUrl();
+
+		$params = [
+			'shopID'    => $this->params['shopID'],
+            'secret'    => $this->params['secret'],
+            'orderNumber' => $this->order->id,
+            'amount'      => $this->order->getTotal(),
+            'returnURL'    => $this->params['returnURL'],
+            'additionalOfdParams' => []
+		]; 
         
-        if ($this->params['orderBundle'] && !$this->params['receiptAfterPayment']) {
-            $paymentData['receipt'] = $this->getReciept();
-        }        
-
-        if ($this->params['paymentType']) {
-            $paymentData['payment_method_data'] = [
-                'type' => $this->params['paymentType'],
-            ];
-        }
-
-		return $paymentData;
-	}
-	
+        
+        $phone = preg_replace('/\D/','',$this->order->getPhone());
+        $client = new \YooKassa\Client();
+        $client->setAuth($this->params['shopID'], $this->params['secret']);
+        $idempotenceKey = uniqid('', true);
+        try {
+            $idempotenceKey = uniqid('', true);
+            $payment['amount']['value'] = (float)$params['amount'];
+            $payment['amount']['currency'] = 'RUB';
+            $payment['confirmation']['type'] = 'redirect';
+            $payment['confirmation']['locale'] = 'ru_RU';
+            $payment['confirmation']['return_url'] = $return;
+            $payment['capture'] = true;
+            $payment['description'] = 'Заказ '.$params['orderNumber'];
+            $payment['metadata']['orderNumber'] = $params['orderNumber'];
+            $payment['receipt']['items'] = $this->getItems();
+            $payment['receipt']['tax_system_code'] = $this->params['taxSystem'];
+            if ($this->order->getEmail()) {
+                $payment['receipt']['customer']['email'] = $this->order->getEmail();
+            }
+            if ($phone) {
+                $payment['receipt']['customer']['phone']  = $phone;
+            } 
+            if ($this->order->getName()) {
+                $payment['receipt']['customer']['full_name']  = $this->order->getName();
+            }
+            $response = $client->createPayment($payment,$idempotenceKey);
+            $status= $response->getStatus();
+            $confirmationUrl = $response->getConfirmation()->getConfirmationUrl();
+            if (isset($status) and ($status != "canceled") and isset($confirmationUrl)){
+                $this->saveTransaction($response->getId(), $payment);
+                return $confirmationUrl;
+            }
+            else {
+                throw new \Exception('Что-то пошло не так');
+            }  
+        } catch (\Exception $e) {
+            $response = $e;
+        }			
+	     
+    }
+    
 	public function getItems()
 	{
-		$items = [];
-		
-		$i = 1;
-		foreach ($this->order->getProducts() as $p) {
-			$items[] = [
-				'description' => $p['name'],
-				'quantity'    => intval($p['quantity']),
-				"amount" => [
-					"value" => $p['price'],
-					"currency" => $this->order->getCurrency()->code
-				],   
-				"vat_code" => $this->params['vat_code'],
-				"payment_subject" => $this->params['paymentSubjectType'],
-				"payment_mode" => $this->params['paymentMethodType'],
-			];
-		}
-
-		return $items;		
-	}		
-	
-	public function getReciept()
-	{
-		$items = $this->getItems();
-
-        $customer = [
-            "full_name" => $this->order->getName()
-        ];
+        $items = [];
+        foreach ($this->order->getProducts() as $p) {
+            $items[] = [
+                'description' => $p['name'],
+                'quantity' => intval($p['quantity']),
+                'amount' => [
+                    'value' => $p['price'],
+                    'currency' => 'RUB'
+                ],
+                'payment_mode' =>  $this->params['paymentMethod'],
+                'measure' => 'piece',
+                'payment_subject' => $this->params['paymentObject'], 
+                'country_of_origin_code' => 'RU',
+                'vat_code' => $this->params['taxType'], 
+                'itemCode' => $p['id'],
+            ];
+        }
+        return $items;
+    }        
         
-        if ($this->order->getEmail()) {
-            $customer['email'] = $this->order->getEmail();
+    public static function isRefundAllowed() {
+        return true;
+    }
+    
+    private function getOrderId() {
+        $data = $this->getTransactions();
+        
+        if (!count($data)) {
+            throw new \Exception('Нет информации о платеже');
         }
-        $phone = preg_replace('/\D/','',$this->order->getPhone());
-        if ($phone) {
-            $customer['phone'] = $phone;
+        $orderId = null;
+        foreach ($data as $d) {
+            if (isset($d['data']['orderId'])) {
+                $orderId = $d['data']['orderId'];
+                break;
+            }
+            if (isset($d['data']['mdOrder'])) {
+                $orderId = $d['data']['mdOrder'];
+                break;
+            }            
+        }
+        if (!$orderId) {
+            throw new \Exception('Не получилось определить параметры платежа');
         }
 
-		$receipt = [
-			'send' => true,
-			'type' => 'payment',
-			"customer" => $customer,
-		    "tax_system_code" => $this->params['tax_system_code'],
-		    "items" => $items,
-			'settlements' => [
-				[
-				    'type' => 'cashless',
-				    'amount' => [
-						'value' => $this->order->getTotal(),
-						'currency' => $this->order->getCurrency()->code,
-				    ]
-				]
-			]		   
+        return $orderId;
+    }
+    
+    public function refund( $items = null ) {
+              
+		$params = [
+			'shopID'    => $this->params['shopID'],
+            'secret'    => $this->params['secret'],
+            'orderId'     => $this->getOrderId(),
+            'amount'      => $this->order->getTotal(),
 		];
+        $client = new \YooKassa\Client();
+        $client->setAuth($this->params['shopID'], $this->params['secret']);
+        $idempotenceKey = uniqid('', true);
 
-		return $receipt;
-	}
+        if ($items !== null) {
+            $i = [];
+            $amount = 0;
+            foreach ($items as $key => $item) {
+                if ($item['quantity_refund'] <= 0) continue;
+                $price = $item['price'];
+                $amount += intval($item['quantity_refund']) * $price;
+                $i[] = [
+                    'positionId' => $key+1,
+                    'name'       => $item['name'],
+                    'quantity' => [
+                        'value'   => intval($item['quantity_refund']),
+                        'measure' => 'шт.'
+                    ],
+                    'itemAmount' => intval($item['quantity_refund']) * $price,  
+                    'itemCode'   => $item['id'], 
+                    'itemPrice'  => $price, 
+                ];
+            }
+        }
+
+
+        try {
+            $refund['payment_id'] = $this->getPaymentId();
+            $refund['amount']['value'] = $amount;
+            $refund['amount']['currency'] = 'RUB';
+            $response = $client->createRefund($refund,$idempotenceKey);
+            $status=$response->getStatus();
+
+            if(isset($status) && $status == "succeeded" ){
+                $res = $this->sendReceiptRefund( $items );
+                return;	
+            }
+            else {
+                throw new \Exception('Ошибка в процессе возврата');
+            }   
+        } catch (\Exception $e) {
+            $response = $e;
+        }    
+    } 
+    
 }
