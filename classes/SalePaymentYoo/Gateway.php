@@ -232,7 +232,6 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                 'payment_subject' => $this->params['paymentObject'], 
                 'country_of_origin_code' => 'RU',
                 'vat_code' => $this->params['taxType'], 
-                'itemCode' => $p['id'],
             ];
         }
         return $items;
@@ -250,12 +249,12 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
         }
         $orderId = null;
         foreach ($data as $d) {
-            if (isset($d['data']['orderId'])) {
-                $orderId = $d['data']['orderId'];
+            if (isset($d['order_id'])) {
+                $orderId = $d['order_id'];
                 break;
             }
-            if (isset($d['data']['mdOrder'])) {
-                $orderId = $d['data']['mdOrder'];
+            if (isset($d['mdOrder'])) {
+                $orderId = $d['mdOrder'];
                 break;
             }            
         }
@@ -277,36 +276,32 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
         $client = new \YooKassa\Client();
         $client->setAuth($this->params['shopID'], $this->params['secret']);
         $idempotenceKey = uniqid('', true);
-
-        if ($items !== null) {
-            $i = [];
-            $amount = 0;
-            foreach ($items as $key => $item) {
-                if ($item['quantity_refund'] <= 0) continue;
-                $price = $item['price'];
-                $amount += intval($item['quantity_refund']) * $price;
-                $i[] = [
-                    'positionId' => $key+1,
-                    'name'       => $item['name'],
-                    'quantity' => [
-                        'value'   => intval($item['quantity_refund']),
-                        'measure' => 'шт.'
-                    ],
-                    'itemAmount' => intval($item['quantity_refund']) * $price,  
-                    'itemCode'   => $item['id'], 
-                    'itemPrice'  => $price, 
-                ];
-            }
-        }
-
-
         try {
+            if ($items !== null) {
+                $i = [];
+                $amount = 0;
+                foreach ($items as $key => $item) {
+                    if ($item['quantity_refund'] <= 0) continue;
+                    $price = $item['price'];
+                    $amount += intval($item['quantity_refund']) * $price;
+                    $i[] = [
+                        'description' => $item['name'],
+                        'quantity' =>  intval($item['quantity_refund']),
+                        'amount' => intval($item['quantity_refund']) * $price,  
+                        'payment_mode' =>  $this->params['paymentMethod'],
+                        'measure' => 'piece',
+                        'payment_subject' => $this->params['paymentObject'], 
+                        'country_of_origin_code' => 'RU',
+                        'vat_code' => $this->params['taxType']
+                    ];
+                }
+            }
             $refund['payment_id'] = $this->getPaymentId();
             $refund['amount']['value'] = $amount;
             $refund['amount']['currency'] = 'RUB';
+            $refund['receipt']['items'] = $i;
             $response = $client->createRefund($refund,$idempotenceKey);
             $status=$response->getStatus();
-
             if(isset($status) && $status == "succeeded" ){
                 $res = $this->sendReceiptRefund( $items );
                 return;	

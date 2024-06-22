@@ -6,15 +6,13 @@ $application->initPlugins();
 ob_start();
 
 try {
-	file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." request ".var_export($_REQUEST)." "."\n", FILE_APPEND);
-    $id = $_REQUEST['id'];
-	$event = $_REQUEST['event'];
-	file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." id ".$id." "."\n", FILE_APPEND);
-	file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." event ".$event." "."\n", FILE_APPEND);
+    $inputJSON = file_get_contents('php://input');
+    $input= json_decode( $inputJSON, TRUE ); 
+    $id = $input['id'];
+	$event = $input['event'];
 	if(isset($id)){
-		$oid = self::getDbConnection()->fetchColumn('SELECT order_id FROM sale_payment_transactions WHERE transaction_id=?',[$id]);
+		$oid = \Cetera\DbConnection::getDbConnection()->fetchColumn('SELECT order_id FROM sale_payment_transactions WHERE transaction_id=?',[$id]);
 	}
-	file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." oid ".$oid." "."\n", FILE_APPEND);
 	$order = \Sale\Order::getById( $oid );
 	$gateway = $order->getPaymentGateway();
     
