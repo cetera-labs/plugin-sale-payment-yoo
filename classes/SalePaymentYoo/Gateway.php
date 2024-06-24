@@ -175,7 +175,6 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
 		]; 
         
         
-        $phone = preg_replace('/\D/','',$this->order->getPhone());
         $client = new \YooKassa\Client();
         $client->setAuth($this->params['shopID'], $this->params['secret']);
         $idempotenceKey = uniqid('', true);
@@ -194,6 +193,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
             if ($this->order->getEmail()) {
                 $payment['receipt']['customer']['email'] = $this->order->getEmail();
             }
+            $phone = preg_replace('/\D/','',$this->order->getPhone());
             if ($phone) {
                 $payment['receipt']['customer']['phone']  = $phone;
             } 
@@ -287,7 +287,10 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                     $i[] = [
                         'description' => $item['name'],
                         'quantity' =>  intval($item['quantity_refund']),
-                        'amount' => intval($item['quantity_refund']) * $price,  
+                        'amount' => [
+                            'value' => intval($item['quantity_refund']) * $price,
+                            'currency' => 'RUB'
+                        ], 
                         'payment_mode' =>  $this->params['paymentMethod'],
                         'measure' => 'piece',
                         'payment_subject' => $this->params['paymentObject'], 
@@ -299,6 +302,15 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
             $refund['payment_id'] = $this->getPaymentId();
             $refund['amount']['value'] = $amount;
             $refund['amount']['currency'] = 'RUB';
+            $refund['cancellation_details']['party'] = 'merchant';
+            $refund['cancellation_details']['reason'] = 'canceled_by_merchant';
+            if ($this->order->getEmail()) {
+                $refund['receipt']['customer']['email'] = $this->order->getEmail();
+            }
+            $phone = preg_replace('/\D/','',$this->order->getPhone());
+            if ($phone) {
+                $refund['receipt']['customer']['phone']  = $phone;
+            } 
             $refund['receipt']['items'] = $i;
             $response = $client->createRefund($refund,$idempotenceKey);
             $status=$response->getStatus();
@@ -311,6 +323,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
             }   
         } catch (\Exception $e) {
             $response = $e;
+            file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." ".$_SERVER['QUERY_STRING']." ".$e->getMessage()."\n", FILE_APPEND);
         }    
     } 
     
