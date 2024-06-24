@@ -8,7 +8,7 @@ ob_start();
 try {
     $inputJSON = file_get_contents('php://input');
     $input= json_decode( $inputJSON, TRUE ); 
-	file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." ".var_export($input,true)." ".$e->getMessage()."\n", FILE_APPEND);
+	file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." ".var_export($input,true)." "."\n", FILE_APPEND);
     $id = $input['id'];
 	$event = $input['event'];
 
