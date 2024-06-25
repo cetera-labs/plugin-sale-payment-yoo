@@ -230,7 +230,6 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                 'payment_mode' =>  $this->params['paymentMethod'],
                 'measure' => 'piece',
                 'payment_subject' => $this->params['paymentObject'], 
-                'country_of_origin_code' => 'RU',
                 'vat_code' => $this->params['taxType'], 
             ];
         }
@@ -294,7 +293,6 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                         'payment_mode' =>  $this->params['paymentMethod'],
                         'measure' => 'piece',
                         'payment_subject' => $this->params['paymentObject'], 
-                        'country_of_origin_code' => 'RU',
                         'vat_code' => $this->params['taxType']
                     ];
                 }
