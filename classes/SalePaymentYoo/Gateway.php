@@ -297,8 +297,11 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                     ];
                 }
             }
+            else{
+                $amount = $this->order->getTotal();
+            }
             $refund['payment_id'] = $this->getPaymentId();
-            $refund['amount']['value'] = $this->params['amount'];
+            $refund['amount']['value'] = $amount;
             $refund['amount']['currency'] = 'RUB';
             $refund['cancellation_details']['party'] = 'merchant';
             $refund['cancellation_details']['reason'] = 'canceled_by_merchant';
@@ -309,7 +312,9 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
             if ($phone) {
                 $refund['receipt']['customer']['phone']  = $phone;
             } 
-            $refund['receipt']['items'] = $i;
+            if ($items !== null) {
+                $refund['receipt']['items'] = $i;
+            }
             $response = $client->createRefund($refund,$idempotenceKey);
             $status=$response->getStatus();
             if(isset($status) && $status == "succeeded" ){
