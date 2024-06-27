@@ -298,7 +298,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                 }
             }
             $refund['payment_id'] = $this->getPaymentId();
-            $refund['amount']['value'] = $amount;
+            $refund['amount']['value'] = $this->params['amount'];
             $refund['amount']['currency'] = 'RUB';
             $refund['cancellation_details']['party'] = 'merchant';
             $refund['cancellation_details']['reason'] = 'canceled_by_merchant';
