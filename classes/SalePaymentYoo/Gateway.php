@@ -118,7 +118,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
     public function getPaymentId(){
 
         $orderId = $this->order->id;
-        return  self::getDbConnection()->fetchColumn('SELECT transaction_id FROM sale_payment_transactions WHERE order_id=?',[$orderId]);
+        return  self::getDbConnection()->fetchColumn('SELECT transaction_id FROM sale_payment_transactions WHERE order_id=? ORDER BY id DESC',[$orderId]);
     }
     public function cancel( )
     {
@@ -235,7 +235,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
         }
         return $items;
     }        
-        
+    
     public static function isRefundAllowed() {
         return true;
     }
