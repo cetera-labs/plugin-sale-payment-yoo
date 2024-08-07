@@ -118,7 +118,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
     public function getPaymentId(){
 
         $orderId = $this->order->id;
-        return  self::getDbConnection()->fetchColumn('SELECT transaction_id FROM sale_payment_transactions WHERE order_id=?',[$orderId]);
+        return  self::getDbConnection()->fetchColumn('SELECT transaction_id FROM sale_payment_transactions WHERE order_id=? ORDER BY id DESC',[$orderId]);
     }
     public function cancel( )
     {
@@ -175,7 +175,6 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
 		]; 
         
         
-        $phone = preg_replace('/\D/','',$this->order->getPhone());
         $client = new \YooKassa\Client();
         $client->setAuth($this->params['shopID'], $this->params['secret']);
         $idempotenceKey = uniqid('', true);
@@ -194,6 +193,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
             if ($this->order->getEmail()) {
                 $payment['receipt']['customer']['email'] = $this->order->getEmail();
             }
+            $phone = preg_replace('/\D/','',$this->order->getPhone());
             if ($phone) {
                 $payment['receipt']['customer']['phone']  = $phone;
             } 
@@ -230,14 +230,12 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                 'payment_mode' =>  $this->params['paymentMethod'],
                 'measure' => 'piece',
                 'payment_subject' => $this->params['paymentObject'], 
-                'country_of_origin_code' => 'RU',
                 'vat_code' => $this->params['taxType'], 
-                'itemCode' => $p['id'],
             ];
         }
         return $items;
     }        
-        
+    
     public static function isRefundAllowed() {
         return true;
     }
@@ -250,12 +248,12 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
         }
         $orderId = null;
         foreach ($data as $d) {
-            if (isset($d['data']['orderId'])) {
-                $orderId = $d['data']['orderId'];
+            if (isset($d['order_id'])) {
+                $orderId = $d['order_id'];
                 break;
             }
-            if (isset($d['data']['mdOrder'])) {
-                $orderId = $d['data']['mdOrder'];
+            if (isset($d['mdOrder'])) {
+                $orderId = $d['mdOrder'];
                 break;
             }            
         }
@@ -277,36 +275,48 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
         $client = new \YooKassa\Client();
         $client->setAuth($this->params['shopID'], $this->params['secret']);
         $idempotenceKey = uniqid('', true);
-
-        if ($items !== null) {
-            $i = [];
-            $amount = 0;
-            foreach ($items as $key => $item) {
-                if ($item['quantity_refund'] <= 0) continue;
-                $price = $item['price'];
-                $amount += intval($item['quantity_refund']) * $price;
-                $i[] = [
-                    'positionId' => $key+1,
-                    'name'       => $item['name'],
-                    'quantity' => [
-                        'value'   => intval($item['quantity_refund']),
-                        'measure' => 'шт.'
-                    ],
-                    'itemAmount' => intval($item['quantity_refund']) * $price,  
-                    'itemCode'   => $item['id'], 
-                    'itemPrice'  => $price, 
-                ];
-            }
-        }
-
-
         try {
+            if ($items !== null) {
+                $i = [];
+                $amount = 0;
+                foreach ($items as $key => $item) {
+                    if ($item['quantity_refund'] <= 0) continue;
+                    $price = $item['price'];
+                    $amount += intval($item['quantity_refund']) * $price;
+                    $i[] = [
+                        'description' => $item['name'],
+                        'quantity' =>  intval($item['quantity_refund']),
+                        'amount' => [
+                            'value' => intval($item['quantity_refund']) * $price,
+                            'currency' => 'RUB'
+                        ], 
+                        'payment_mode' =>  $this->params['paymentMethod'],
+                        'measure' => 'piece',
+                        'payment_subject' => $this->params['paymentObject'], 
+                        'vat_code' => $this->params['taxType']
+                    ];
+                }
+            }
+            else{
+                $amount = $this->order->getTotal();
+            }
             $refund['payment_id'] = $this->getPaymentId();
             $refund['amount']['value'] = $amount;
             $refund['amount']['currency'] = 'RUB';
+            $refund['cancellation_details']['party'] = 'merchant';
+            $refund['cancellation_details']['reason'] = 'canceled_by_merchant';
+            if ($this->order->getEmail()) {
+                $refund['receipt']['customer']['email'] = $this->order->getEmail();
+            }
+            $phone = preg_replace('/\D/','',$this->order->getPhone());
+            if ($phone) {
+                $refund['receipt']['customer']['phone']  = $phone;
+            } 
+            if ($items !== null) {
+                $refund['receipt']['items'] = $i;
+            }
             $response = $client->createRefund($refund,$idempotenceKey);
             $status=$response->getStatus();
-
             if(isset($status) && $status == "succeeded" ){
                 $res = $this->sendReceiptRefund( $items );
                 return;	
@@ -316,6 +326,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
             }   
         } catch (\Exception $e) {
             $response = $e;
+            file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." ".$_SERVER['QUERY_STRING']." ".$e->getMessage()."\n", FILE_APPEND);
         }    
     } 
     
