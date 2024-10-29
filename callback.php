@@ -19,6 +19,7 @@ try {
     
     $oid = $gateway->getOrderByTransaction( $id );
     if ($oid != $order->id) {
+		file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." ".$_SERVER['QUERY_STRING']." Order check failed.oid: ".$oid."\n", FILE_APPEND);
         throw new \Exception('Order check failed');
     }
 		
@@ -26,8 +27,12 @@ try {
 	if  (isset($event) && $event == 'succeeded') {
 		$order->paymentSuccess();
 		try {
-			$gateway->sendReceiptSell();
-		} catch (\Exception $e) {}
+			$gateway->sendReceiptSell(true);
+		} catch (\Exception $e) {
+			header( "HTTP/1.1 500 ".trim(preg_replace('/\s+/', ' ', $e->getMessage())) );
+			print $e->getMessage();
+			file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." ".$_SERVER['QUERY_STRING']." ".$e->getMessage()."\n", FILE_APPEND);
+		 }
 	}
 	
 	header("HTTP/1.1 200 OK");
