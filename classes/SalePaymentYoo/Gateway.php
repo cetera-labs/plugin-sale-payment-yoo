@@ -322,11 +322,20 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                 return;	
             }
             else {
-                throw new \Exception('Ошибка в процессе возврата');
+                throw new \Exception(
+                    'Ошибка в процессе возврата. Ответ YooKassa: ' . json_encode($response)
+                );
             }   
         } catch (\Exception $e) {
             $response = $e;
-            file_put_contents($_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log', date('Y.m.d H:i:s')." ".$_SERVER['QUERY_STRING']." ".$e->getMessage()."\n", FILE_APPEND);
+           file_put_contents(
+                $_SERVER['DOCUMENT_ROOT'] . '/uploads/logs/yookassa.log',
+                date('Y.m.d H:i:s') . " " .
+                $_SERVER['QUERY_STRING'] . " " .
+                $e->getMessage() . " | " .
+                $e->getFile() . ":" . $e->getLine() . "\n",
+                FILE_APPEND
+            );
         }    
     } 
     
