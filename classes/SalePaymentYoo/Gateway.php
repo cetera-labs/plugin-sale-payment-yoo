@@ -322,7 +322,9 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
                 return;	
             }
             else {
-                throw new \Exception('Ошибка в процессе возврата');
+                throw new \Exception(
+                    'Ошибка в процессе возврата. Ответ YooKassa: ' . json_encode($response)
+                );
             }   
         } catch (\Exception $e) {
             $response = $e;
