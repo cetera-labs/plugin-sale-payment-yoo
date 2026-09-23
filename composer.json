@@ -11,7 +11,7 @@
         }
     ],
     "require": {
-        "cetera-labs/plugin-sale": "*",
+        "cetera-labs/plugin-sale": "^1.0",
         "yoomoney/yookassa-sdk-php": "^2.0"
     },
     
