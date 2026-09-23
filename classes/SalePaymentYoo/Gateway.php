@@ -184,7 +184,7 @@ class Gateway extends \Sale\PaymentGateway\GatewayAtol {
             $payment['amount']['currency'] = 'RUB';
             $payment['confirmation']['type'] = 'redirect';
             $payment['confirmation']['locale'] = 'ru_RU';
-            $payment['confirmation']['return_url'] = $return;
+            $payment['confirmation']['return_url'] = $params['returnURL'];
             $payment['capture'] = true;
             $payment['description'] = 'Заказ '.$params['orderNumber'];
             $payment['metadata']['orderNumber'] = $params['orderNumber'];
